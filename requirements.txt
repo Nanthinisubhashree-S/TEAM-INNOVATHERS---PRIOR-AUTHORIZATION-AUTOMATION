@@ -5,3 +5,4 @@ onnxruntime
 reportLab
 pdfplumber
 google.generativeai
+joblib
