@@ -9,11 +9,9 @@ import joblib
 import google.generativeai as genai
 import json
 from datetime import datetime, date
+import os
+DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")
 
-# ----------------------------- Config -----------------------------
-DB_PATH = "prior_auth.db"
-
-# ------------------------ Gemini Setup ------------------------
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-1.5-flash")
 
@@ -70,7 +68,6 @@ def check_within_range(result_str, range_str):
         else: return False
     except: return False
 
-# ------------------------ UPDATED LOGIC ------------------------
 def approve_treatment(treatment, df):
     required_tests = procedure_rules.get(treatment, [])
     results = {}
@@ -81,12 +78,11 @@ def approve_treatment(treatment, df):
         if not row.empty:
             result = row.iloc[0]["Result"]; normal_range = row.iloc[0]["Normal Range"]
             status = check_within_range(result, normal_range)
-            if not status:  # OUT OF RANGE → triggers approval
+            if not status:
                 any_out_of_range = True
             results[rule_test] = f"Pass ✅ (Result: {result}, Range: {normal_range})" if status else f"Fail ❌ (Result: {result}, Range: {normal_range})"
         else:
             results[rule_test] = "Not Found ⚠"
 
-    # REVERSE LOGIC: OUT OF RANGE → Approve; All in range → Deny
     approved = any_out_of_range
     return ("Approved ✅" if approved else "Denied ❌"), results
