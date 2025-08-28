@@ -14,16 +14,12 @@ import onnxruntime as ort
 import pandas as pd
 from auditnew import ensure_audit_table, log_audit
 from reports import extract_text, ask_llm_for_parameters, approve_treatment
-
+import os
 
 def render_pa_page():
     ensure_audit_table()
 
-    # ----------------------------- Config -----------------------------
-    DB_PATH = "prior_auth.db"
-    ONNX_MODEL_PATH = "yolov7-p6-bonefracture.onnx"
-
-    # Load fracture detection ONNX model
+    DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")    ONNX_MODEL_PATH = "yolov7-p6-bonefracture.onnx"
     session = ort.InferenceSession(ONNX_MODEL_PATH)
     bone_to_icd10 = {
         'femur': 'S72.0',
@@ -37,7 +33,6 @@ def render_pa_page():
         "S52.5": ["S52.5", "S52.6", "S52.7", "S52.8"]
     }
 
-    # ----------------------------- Helpers -----------------------------
     def to_int(x, default=0):
         try:
             if x is None:
@@ -103,7 +98,6 @@ def render_pa_page():
                 return row[0].strip()
         return None
 
-    # ----------------------------- Rule Engine -----------------------------
     def check_rules(conn, patient_id, treatment_name, provider_npi):
         cur = conn.cursor()
         reasons = []
@@ -119,7 +113,7 @@ def render_pa_page():
         else:
             patient_age, insurance_id = to_int(p[0]), p[1]
 
-        # Rule 5: Claim date within policy term (3 years)
+        # Rule 1: Claim date within policy term (3 years)
         claim_date = None
         if insurance_id:
             cur.execute("SELECT Claim_Date FROM insurance_table WHERE Insurance_ID=?", (insurance_id,))
@@ -128,7 +122,7 @@ def render_pa_page():
             if not claim_date or (date.today() - claim_date).days > 365 * 3:
                 reasons.append("Claim date outside 3 years")
 
-        # Rule 8: Provider active
+        # Rule 2: Provider active
         cur.execute("SELECT Start_date, End_date, Rndrng_Prvdr_Type FROM provider_table WHERE Rndrng_NPI=?",
                     (provider_npi_int,))
         prov = cur.fetchone()
@@ -142,12 +136,12 @@ def render_pa_page():
             reasons.append("Provider not found")
             prov_type = None
 
-        # Rule 9: Valid treatment
+        # Rule 3: Valid treatment
         cur.execute("SELECT COUNT(1) FROM treatment_table WHERE treatment_name=?", (treatment_name,))
         if cur.fetchone()[0] <= 0:
             reasons.append(f"Treatment '{treatment_name}' not authorized")
 
-        # Rule 9b: Provider services should not exceed beneficiaries
+        # Rule 4: Provider services should not exceed beneficiaries
         cur.execute("SELECT Tot_Srvcs, Tot_Benes FROM provider_table WHERE Rndrng_NPI=?", (provider_npi_int,))
         row = cur.fetchone()
         if row:
@@ -157,7 +151,7 @@ def render_pa_page():
         else:
             reasons.append("Provider service/beneficiary data not found")
 
-        # Rule 10: Provider type matches treatment dynamically
+        # Rule 5: Provider type matches treatment dynamically
         treatment_provider_map = {
             "Dialysis": "Nephrologist",
             "Chemotherapy": "Oncologist",
@@ -173,7 +167,6 @@ def render_pa_page():
         summary = "; ".join(reasons) if reasons else "All rules passed"
         return overall_decision, summary
 
-    # ----------------------------- Fracture X-ray Helpers -----------------------------
     def preprocess_image(image):
         image = image.convert('RGB')
         image = image.resize((640, 640))
@@ -205,7 +198,6 @@ def render_pa_page():
         icd10_codes = [bone_to_icd10[bone] for bone in detected_bones]
         return detected_bones, icd10_codes
 
-    # ----------------------------- PDF Generation -----------------------------
     def generate_pdf(patient_id, treatment, provider, rule_status, proof_status, final_decision, summary):
         buffer = BytesIO()
         c = canvas.Canvas(buffer)
@@ -222,7 +214,6 @@ def render_pa_page():
         buffer.seek(0)
         return buffer
 
-    # ----------------------------- Streamlit UI -----------------------------
     st.title("⚖ Prior Authorization Approval System")
 
     uploaded_file = st.file_uploader("Upload PA PDF/Docx", type=["pdf", "docx"])
@@ -246,7 +237,6 @@ def render_pa_page():
                 with st.spinner("🔎 Analyzing lab report..."):
                     text = extract_text(lab_file)
 
-                    # Ask LLM for structured test results
                     json_str = ask_llm_for_parameters(text, treatment_name)
                     st.subheader("🔎 Extracted Data from Report")
                     st.code(json_str, language="json")
@@ -261,7 +251,6 @@ def render_pa_page():
                         st.subheader("📊 Extracted Parameters")
                         st.dataframe(df)
 
-                        # Run approval based on test results
                         doc_decision, details = approve_treatment(treatment_name, df)
 
                         st.subheader("📋 Lab Report Verification")
@@ -280,8 +269,8 @@ def render_pa_page():
 
         elif proof_choice == "X-ray Fracture":
             xray_file = st.file_uploader("Upload X-ray Image", type=["jpg", "jpeg", "png"])
-            if xray_file and extracted["ICD-10_Codes"]:  # use extracted ICD-10 directly
-                icd10_claimed = extracted["ICD-10_Codes"][0]  # take first extracted ICD-10
+            if xray_file and extracted["ICD-10_Codes"]:
+                icd10_claimed = extracted["ICD-10_Codes"][0]
                 image = Image.open(xray_file)
                 image_np = preprocess_image(image)
                 outputs = detect_fracture(image_np)
@@ -299,14 +288,11 @@ def render_pa_page():
                     st.error(f"Fracture Verification Failed ❌ (Expected: {icd10_claimed}, Got: {predicted_icd10_codes})")
 
         if st.button("Generate Final PDF"):
-            # ✅ 1. Compute decision
             final_decision = "APPROVED" if rule_status == "APPROVED" and proof_status == "APPROVED" else "DENIED"
             st.write(f"Final Decision: {final_decision}")
 
-            # ✅ 2. Get ICD-10 code (take first if multiple)
             icd10_code = extracted["ICD-10_Codes"][0] if extracted.get("ICD-10_Codes") else None
 
-            # ✅ 3. Log into audit trail
             log_audit(
                 extracted["Patient_ID"],
                 treatment_name,
@@ -317,7 +303,6 @@ def render_pa_page():
                 final_decision
             )
 
-            # ✅ 4. Generate PDF as before
             pdf_buffer = generate_pdf(
                 extracted["Patient_ID"],
                 treatment_name,
@@ -325,7 +310,7 @@ def render_pa_page():
                 rule_status,
                 proof_status,
                 final_decision,
-                rule_summary  # summary is just for PDF, not audit log
+                rule_summary
             )
             st.download_button("Download PA Result PDF",
                                data=pdf_buffer,
