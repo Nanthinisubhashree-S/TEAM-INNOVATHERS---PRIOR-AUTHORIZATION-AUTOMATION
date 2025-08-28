@@ -1,6 +1,7 @@
 # auditnew.py
 import sqlite3
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")
@@ -33,7 +34,7 @@ def log_audit(patient_id, treatment_name, icd10_code, provider_npi,
             (timestamp, patient_id, treatment_name, icd10_code, provider_npi, rule_status, proof_status, final_decision)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d %H:%M:%S"),
             patient_id or "",
             treatment_name or "",
             icd10_code or "",
