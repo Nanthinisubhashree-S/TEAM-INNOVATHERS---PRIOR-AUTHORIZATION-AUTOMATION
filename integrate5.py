@@ -19,7 +19,8 @@ import os
 def render_pa_page():
     ensure_audit_table()
 
-    DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")    ONNX_MODEL_PATH = "yolov7-p6-bonefracture.onnx"
+    DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")
+    ONNX_MODEL_PATH = "yolov7-p6-bonefracture.onnx"
     session = ort.InferenceSession(ONNX_MODEL_PATH)
     bone_to_icd10 = {
         'femur': 'S72.0',
