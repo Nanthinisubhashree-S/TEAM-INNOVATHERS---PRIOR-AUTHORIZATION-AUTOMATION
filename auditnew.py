@@ -1,8 +1,9 @@
 # auditnew.py
 import sqlite3
 from datetime import datetime
+import os
 
-DB_PATH = "prior_auth.db"
+DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")
 
 def ensure_audit_table():
     with sqlite3.connect(DB_PATH) as conn:
