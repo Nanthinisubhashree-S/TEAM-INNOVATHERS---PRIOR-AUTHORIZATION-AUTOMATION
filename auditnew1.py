@@ -59,7 +59,7 @@ def render_audit_page():
     st.sidebar.header("Filters")
     patient_filter = st.sidebar.text_input("Patient ID")
     provider_filter = st.sidebar.text_input("Provider NPI")
-    treatment_filter = st.sidebar.text_input("Treatment Name")  # ✅ NEW FILTER
+    treatment_filter = st.sidebar.text_input("Treatment Name")
 
     decision_options = sorted([x for x in df["final_decision"].unique().tolist() if x])
     final_decision_filter = st.sidebar.selectbox(
