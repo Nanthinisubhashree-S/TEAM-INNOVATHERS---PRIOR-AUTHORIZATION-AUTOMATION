@@ -7,3 +7,4 @@ pdfplumber
 google.generativeai
 joblib
 plotly
+openpyxl
