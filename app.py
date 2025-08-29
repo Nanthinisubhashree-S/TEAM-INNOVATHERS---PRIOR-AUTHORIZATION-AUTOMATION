@@ -38,7 +38,7 @@ st.sidebar.image("logo1.jpg", use_container_width=True)  # optional logo
 st.sidebar.title("📌 Navigation")
 page = st.sidebar.radio(
     "Go to:",
-    ["Main Dashboard", "Prior Authorization", "Audit Logs"]
+    ["Home", "Prior Authorization", "Audit Logs"]
 )
 
 if page == "Home":
