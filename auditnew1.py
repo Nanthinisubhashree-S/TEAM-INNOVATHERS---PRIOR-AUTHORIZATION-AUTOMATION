@@ -33,13 +33,11 @@ def compute_delta(current, previous, total_logs=None):
 def render_audit_page():
     st.title("📊 Smart Audit Explorer")
 
-    # Fetch audit data
     df = get_audit_logs()
     if df.empty:
         st.warning("No audit logs found!")
         return
 
-    # --- Clean & normalize ---
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
     if "final_decision" not in df:
@@ -58,7 +56,6 @@ def render_audit_page():
         })
     )
 
-    # ---------------- Sidebar Filters ----------------
     st.sidebar.header("Filters")
     patient_filter = st.sidebar.text_input("Patient ID")
     provider_filter = st.sidebar.text_input("Provider NPI")
@@ -82,7 +79,6 @@ def render_audit_page():
         [start_default, end_default]
     )
 
-    # ---------------- Apply filters (excluding date_range) ----------------
     base_filtered = df.copy()
 
     if patient_filter:
@@ -93,14 +89,13 @@ def render_audit_page():
         base_filtered = base_filtered[
             base_filtered["provider_npi"].astype(str).str.contains(provider_filter, case=False, na=False)
         ]
-    if treatment_filter:  # ✅ Apply Treatment filter
+    if treatment_filter:
         base_filtered = base_filtered[
             base_filtered["treatment_name"].astype(str).str.contains(treatment_filter, case=False, na=False)
         ]
     if final_decision_filter != "All":
         base_filtered = base_filtered[base_filtered["final_decision"] == final_decision_filter]
 
-    # ---------------- Current period filtered DF ----------------
     df_filtered = base_filtered.copy()
     if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
         start_date, end_date = date_range
@@ -109,7 +104,6 @@ def render_audit_page():
             (df_filtered["timestamp"].dt.date <= end_date)
         ]
 
-    # ---------------- Previous period ----------------
     if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
         start_date, end_date = date_range
     else:
@@ -123,7 +117,6 @@ def render_audit_page():
         (base_filtered["timestamp"].dt.date <= prev_end)
     ]
 
-    # ---------------- Key Metrics ----------------
     st.subheader("📌 Key Metrics")
 
     total_logs = int(len(df_filtered))
@@ -136,7 +129,6 @@ def render_audit_page():
     prev_denied = int(df_prev_period["final_decision"].value_counts().get("DENIED", 0))
     prev_pending = int(df_prev_period["final_decision"].value_counts().get("PENDING", 0))
 
-    # Create delta strings
     total_delta = compute_delta(total_logs, prev_total, total_logs)
     approved_delta = compute_delta(approved_count, prev_approved, total_logs)
     denied_delta = compute_delta(denied_count, prev_denied, total_logs)
@@ -148,7 +140,6 @@ def render_audit_page():
     col3.metric("Denied", denied_count, denied_delta,  delta_color="inverse")
     col4.metric("Pending", pending_count, pending_delta)
 
-    # ---------------- Visual Insights ----------------
     st.subheader("📈 Visual Insights")
 
     if not df_filtered.empty:
@@ -176,13 +167,11 @@ def render_audit_page():
         )
         st.plotly_chart(fig_pie, use_container_width=True)
 
-        # Logs Over Time
         trend = df_filtered.groupby(df_filtered["timestamp"].dt.date).size().reset_index(name="count")
         trend.columns = ["timestamp", "count"]
         fig_line = px.line(trend, x="timestamp", y="count", title="Logs Over Time", markers=True)
         st.plotly_chart(fig_line, use_container_width=True)
 
-        # Top Providers
         if "provider_npi" in df_filtered:
             top_providers = df_filtered["provider_npi"].astype(str).value_counts().head(5).reset_index()
             top_providers.columns = ["provider_npi", "count"]
@@ -193,7 +182,6 @@ def render_audit_page():
     else:
         st.info("No records match the current filters.")
 
-    # ---------------- Logs Table ----------------
     st.subheader("📋 Audit Logs Table")
     st.write(f"Showing {len(df_filtered)} records (period: {start_date} → {end_date})")
 
@@ -205,8 +193,6 @@ def render_audit_page():
         df_table["timestamp"] = df_table["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
     st.dataframe(df_table[available_cols], use_container_width=True)
 
-    # ---------------- Exports ----------------
-    # CSV
     csv_data = df_filtered.to_csv(index=False)
     st.download_button(
         label="⬇ Full Audit Logs",
@@ -215,7 +201,6 @@ def render_audit_page():
         mime="text/csv"
     )
 
-    # Excel
     excel_buffer = BytesIO()
     try:
         with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
