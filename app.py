@@ -50,5 +50,4 @@ elif page == "Prior Authorization":
     integrate5.render_pa_page()
 
 elif page == "Audit Logs":
-    st.title("📄 Audit Logs")
     auditnew1.render_audit_page()
