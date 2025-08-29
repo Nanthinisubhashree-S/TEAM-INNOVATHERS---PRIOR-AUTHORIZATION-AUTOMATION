@@ -1,4 +1,3 @@
-#integrate5.py
 import streamlit as st
 import sqlite3
 from PyPDF2 import PdfReader
@@ -7,6 +6,7 @@ import re
 from datetime import datetime, date
 import tempfile
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import LETTER
 from io import BytesIO
 from PIL import Image
 import numpy as np
@@ -14,13 +14,16 @@ import onnxruntime as ort
 import pandas as pd
 from auditnew import ensure_audit_table, log_audit
 from reports import extract_text, ask_llm_for_parameters, approve_treatment
-import os
+
 
 def render_pa_page():
     ensure_audit_table()
 
-    DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")
+    # ----------------------------- Config -----------------------------
+    DB_PATH = "prior_auth.db"
     ONNX_MODEL_PATH = "yolov7-p6-bonefracture.onnx"
+
+    # Load fracture detection ONNX model
     session = ort.InferenceSession(ONNX_MODEL_PATH)
     bone_to_icd10 = {
         'femur': 'S72.0',
@@ -34,6 +37,7 @@ def render_pa_page():
         "S52.5": ["S52.5", "S52.6", "S52.7", "S52.8"]
     }
 
+    # ----------------------------- Helpers -----------------------------
     def to_int(x, default=0):
         try:
             if x is None:
@@ -99,31 +103,39 @@ def render_pa_page():
                 return row[0].strip()
         return None
 
+    # ----------------------------- Rule Engine -----------------------------
     def check_rules(conn, patient_id, treatment_name, provider_npi):
         cur = conn.cursor()
-        reasons = []
+        failed = []
+        passed = []
+
         provider_npi_int = int(provider_npi)
 
         # Rule 0: Patient exists
         cur.execute("SELECT Age, Insurance_ID FROM patient_table WHERE Patient_ID=?", (patient_id,))
         p = cur.fetchone()
         if not p:
-            reasons.append("Patient not found")
+            failed.append("❌ Rule 0: Patient not found in system.")
             patient_age = None
             insurance_id = None
         else:
             patient_age, insurance_id = to_int(p[0]), p[1]
+            passed.append("✅ Rule 0: Patient exists in database.")
 
-        # Rule 1: Claim date within policy term (3 years)
+        # Rule 5: Claim date within policy term (3 years)
         claim_date = None
         if insurance_id:
             cur.execute("SELECT Claim_Date FROM insurance_table WHERE Insurance_ID=?", (insurance_id,))
             ins = cur.fetchone()
             claim_date = parse_date_any(ins[0]) if ins else None
             if not claim_date or (date.today() - claim_date).days > 365 * 3:
-                reasons.append("Claim date outside 3 years")
+                failed.append("❌ Rule 1: Claim date is outside allowed 3 years window.")
+            else:
+                passed.append("✅ Rule 1: Claim date within policy term.")
+        else:
+            failed.append("❌ Rule 1: No insurance data found.")
 
-        # Rule 2: Provider active
+        # Rule 8: Provider active
         cur.execute("SELECT Start_date, End_date, Rndrng_Prvdr_Type FROM provider_table WHERE Rndrng_NPI=?",
                     (provider_npi_int,))
         prov = cur.fetchone()
@@ -132,27 +144,33 @@ def render_pa_page():
             prov_end = parse_date_any(prov[1])
             prov_type = prov[2].strip() if prov[2] else None
             if not (prov_start and prov_end and claim_date and prov_start <= claim_date <= prov_end):
-                reasons.append("Provider not active on claim date")
+                failed.append("❌ Rule 2: Provider not active on claim date.")
+            else:
+                passed.append("✅ Rule 2: Provider active during claim date.")
         else:
-            reasons.append("Provider not found")
+            failed.append("❌ Rule 2: Provider not found in system.")
             prov_type = None
 
-        # Rule 3: Valid treatment
+        # Rule 9: Valid treatment
         cur.execute("SELECT COUNT(1) FROM treatment_table WHERE treatment_name=?", (treatment_name,))
         if cur.fetchone()[0] <= 0:
-            reasons.append(f"Treatment '{treatment_name}' not authorized")
+            failed.append(f"❌ Rule 3: Treatment '{treatment_name}' not authorized.")
+        else:
+            passed.append(f"✅ Rule 3: Treatment '{treatment_name}' is authorized.")
 
-        # Rule 4: Provider services should not exceed beneficiaries
+        # Rule 9b: Provider services vs beneficiaries
         cur.execute("SELECT Tot_Srvcs, Tot_Benes FROM provider_table WHERE Rndrng_NPI=?", (provider_npi_int,))
         row = cur.fetchone()
         if row:
             tot_srvcs, tot_benes = to_int(row[0]), to_int(row[1])
             if tot_srvcs > tot_benes:
-                reasons.append("Provider services exceed beneficiaries.")
+                failed.append("❌ Rule 4: Provider services exceed beneficiaries.")
+            else:
+                passed.append("✅ Rule 4: Provider services within beneficiary limit.")
         else:
-            reasons.append("Provider service/beneficiary data not found")
+            failed.append("❌ Rule 4: No provider service/beneficiary data found.")
 
-        # Rule 5: Provider type matches treatment dynamically
+        # Rule 10: Provider type matches treatment
         treatment_provider_map = {
             "Dialysis": "Nephrologist",
             "Chemotherapy": "Oncologist",
@@ -161,13 +179,23 @@ def render_pa_page():
             "Fracture": "Orthologist"
         }
         expected_type = treatment_provider_map.get(treatment_name)
-        if expected_type and prov_type and prov_type.lower() != expected_type.lower():
-            reasons.append(f"Provider type '{prov_type}' does not match treatment '{treatment_name}'")
+        if expected_type and prov_type:
+            if prov_type.lower() != expected_type.lower():
+                failed.append(f"❌ Rule 5: Provider type '{prov_type}' does not match required '{expected_type}'.")
+            else:
+                passed.append(f"✅ Rule 5: Provider type '{prov_type}' matches treatment '{treatment_name}'.")
 
-        overall_decision = "APPROVED" if not reasons else "DENIED"
-        summary = "; ".join(reasons) if reasons else "All rules passed"
-        return overall_decision, summary
+        overall_decision = "APPROVED" if not failed else "DENIED"
 
+        # Narrative summary
+        if not failed:
+            summary = f"All rules were satisfied. Patient {patient_id} with treatment '{treatment_name}' was approved and the Prior Authorization request is granted."
+        else:
+            summary = f"Request denied because of the following issues: {'; '.join(failed)}. Passed checks: {'; '.join(passed)}."
+
+        return overall_decision, passed, failed, summary
+
+    # ----------------------------- Fracture X-ray Helpers -----------------------------
     def preprocess_image(image):
         image = image.convert('RGB')
         image = image.resize((640, 640))
@@ -199,24 +227,98 @@ def render_pa_page():
         icd10_codes = [bone_to_icd10[bone] for bone in detected_bones]
         return detected_bones, icd10_codes
 
-    def generate_pdf(patient_id, treatment, provider, rule_status, proof_status, final_decision, summary):
+    # ----------------------------- PDF Generation -----------------------------
+    def generate_pdf(patient_id, treatment, provider, rule_status, proof_status, final_decision, passed, failed, summary):
         buffer = BytesIO()
-        c = canvas.Canvas(buffer)
-        c.setFont("Helvetica", 12)
-        c.drawString(50, 800, f"Patient ID: {patient_id}")
-        c.drawString(50, 780, f"Treatment: {treatment}")
-        c.drawString(50, 760, f"Provider NPI: {provider}")
-        c.drawString(50, 740, f"Rule Status: {rule_status}")
-        c.drawString(50, 720, f"Proof Status: {proof_status}")
-        c.drawString(50, 700, f"Final Decision: {final_decision}")
-        c.drawString(50, 680, f"Summary: {summary}")
+        c = canvas.Canvas(buffer, pagesize=LETTER)
+        width, height = LETTER
+
+        # Header / Letterhead
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(200, height - 80, "Insurance Review Summary Letter")
+
+        c.setFont("Helvetica", 10)
+        c.drawString(50, height - 100, f"Date: {datetime.now().strftime('%B %d, %Y')}")
+
+        # Patient & Case Information
+        y = height - 140
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y, "Patient Information:")
+        c.setFont("Helvetica", 11)
+        y -= 20
+        c.drawString(70, y, f"Patient ID: {patient_id}")
+        y -= 15
+        c.drawString(70, y, f"Treatment Requested: {treatment}")
+        y -= 15
+        c.drawString(70, y, f"Provider NPI: {provider}")
+
+        # Review Findings
+        y -= 40
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y, "Review Findings:")
+        c.setFont("Helvetica", 11)
+        y -= 20
+        c.drawString(70, y, f"Rule Status: {rule_status}")
+        y -= 15
+        c.drawString(70, y, f"Proof Status: {proof_status}")
+
+        # Rule Verification Section
+        y -= 40
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y, "Detailed Rule Verification:")
+        c.setFont("Helvetica", 11)
+
+        y -= 20
+        if passed:
+            c.drawString(70, y, "✅ Passed Rules:")
+            y -= 15
+            for p in passed:
+                c.drawString(90, y, f"- {p}")
+                y -= 15
+
+        if failed:
+            y -= 10
+            c.drawString(70, y, "❌ Failed Rules:")
+            y -= 15
+            for f in failed:
+                c.drawString(90, y, f"- {f}")
+                y -= 15
+
+        # Narrative Summary
+        y -= 30
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y, "Narrative Summary:")
+        y -= 20
+        c.setFont("Helvetica", 11)
+        text_lines = summary.split(". ")
+        for line in text_lines:
+            c.drawString(70, y, line.strip() + ".")
+            y -= 15
+            if y < 100:  # new page if text overflows
+                c.showPage()
+                y = height - 80
+                c.setFont("Helvetica", 11)
+
+        # Final Decision
+        y -= 40
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, y, "Final Decision:")
+        y -= 20
+        c.setFont("Helvetica", 11)
+        decision_text = f"Based on the review, the prior authorization request has been {final_decision.upper()}."
+        c.drawString(70, y, decision_text)
+
+        # Footer
+        y -= 60
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawString(50, y, "This letter is generated as part of the insurance authorization review process.")
+
         c.showPage()
         c.save()
         buffer.seek(0)
         return buffer
-
-    st.title("⚖ Prior Authorization Approval System")
-
+    # ----------------------------- Streamlit UI -----------------------------
+    
     uploaded_file = st.file_uploader("Upload PA PDF/Docx", type=["pdf", "docx"])
     if uploaded_file:
         extracted = extract_patient_data(uploaded_file)
@@ -225,7 +327,7 @@ def render_pa_page():
 
         conn = sqlite3.connect(DB_PATH)
         treatment_name = get_treatment_from_icd(conn, extracted["ICD-10_Codes"])
-        rule_status, rule_summary = check_rules(conn, extracted["Patient_ID"], treatment_name, extracted["Provider_NPI"])
+        rule_status, passed_rules, failed_rules, rule_summary = check_rules(conn, extracted["Patient_ID"], treatment_name, extracted["Provider_NPI"])
         st.write(f"Rule Engine Status: {rule_status}")
         st.write(f"Rule Summary: {rule_summary}")
 
@@ -238,6 +340,7 @@ def render_pa_page():
                 with st.spinner("🔎 Analyzing lab report..."):
                     text = extract_text(lab_file)
 
+                    # Ask LLM for structured test results
                     json_str = ask_llm_for_parameters(text, treatment_name)
                     st.subheader("🔎 Extracted Data from Report")
                     st.code(json_str, language="json")
@@ -252,6 +355,7 @@ def render_pa_page():
                         st.subheader("📊 Extracted Parameters")
                         st.dataframe(df)
 
+                        # Run approval based on test results
                         doc_decision, details = approve_treatment(treatment_name, df)
 
                         st.subheader("📋 Lab Report Verification")
@@ -270,8 +374,8 @@ def render_pa_page():
 
         elif proof_choice == "X-ray Fracture":
             xray_file = st.file_uploader("Upload X-ray Image", type=["jpg", "jpeg", "png"])
-            if xray_file and extracted["ICD-10_Codes"]:
-                icd10_claimed = extracted["ICD-10_Codes"][0]
+            if xray_file and extracted["ICD-10_Codes"]:  # use extracted ICD-10 directly
+                icd10_claimed = extracted["ICD-10_Codes"][0]  # take first extracted ICD-10
                 image = Image.open(xray_file)
                 image_np = preprocess_image(image)
                 outputs = detect_fracture(image_np)
@@ -289,11 +393,14 @@ def render_pa_page():
                     st.error(f"Fracture Verification Failed ❌ (Expected: {icd10_claimed}, Got: {predicted_icd10_codes})")
 
         if st.button("Generate Final PDF"):
+            # ✅ 1. Compute decision
             final_decision = "APPROVED" if rule_status == "APPROVED" and proof_status == "APPROVED" else "DENIED"
             st.write(f"Final Decision: {final_decision}")
 
+            # ✅ 2. Get ICD-10 code (take first if multiple)
             icd10_code = extracted["ICD-10_Codes"][0] if extracted.get("ICD-10_Codes") else None
 
+            # ✅ 3. Log into audit trail
             log_audit(
                 extracted["Patient_ID"],
                 treatment_name,
@@ -304,6 +411,22 @@ def render_pa_page():
                 final_decision
             )
 
+            # ✅ 4. Generate PDF as before
+            # ✅ Decide narrative summary based on final decision
+            if final_decision == "APPROVED":
+                final_summary = (
+                    f"Prior Authorization request has been APPROVED. "
+                    f"Patient {extracted['Patient_ID']} with treatment '{treatment_name}' "
+                    f"met all required conditions including rules and proof verification."
+                    )
+            else:
+                final_summary = (
+                    f"Prior Authorization request has been DENIED. "
+                    f"Reasons may include failed rules or verification proof mismatch. "
+                    f"Failed checks: {', '.join(failed_rules) if failed_rules else 'None'}. "
+                    f"Proof status: {proof_status}."
+                    )
+                # ✅ Generate PDF with updated narrative
             pdf_buffer = generate_pdf(
                 extracted["Patient_ID"],
                 treatment_name,
@@ -311,8 +434,11 @@ def render_pa_page():
                 rule_status,
                 proof_status,
                 final_decision,
-                rule_summary
-            )
+                passed_rules,
+                failed_rules,
+                final_summary   # 👈 use new summary here
+                )
+
             st.download_button("Download PA Result PDF",
                                data=pdf_buffer,
                                file_name="PA_Result.pdf",

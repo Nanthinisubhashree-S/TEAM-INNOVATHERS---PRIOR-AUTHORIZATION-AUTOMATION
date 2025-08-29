@@ -16,7 +16,7 @@ genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 procedure_rules = {
-    "Cataract": ["Blood Sugar Fasting"],
+    "Cataract": ["Fasting Blood Sugar"],
     "Dialysis": ["eGFR"],
     "Chemotherapy": ["Creatinine"],
     "Angioplasty": ["PT", "INR"]
