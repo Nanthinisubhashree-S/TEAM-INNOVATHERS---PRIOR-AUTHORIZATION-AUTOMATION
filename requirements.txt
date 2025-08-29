@@ -6,3 +6,4 @@ reportLab
 pdfplumber
 google.generativeai
 joblib
+plotly
