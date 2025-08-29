@@ -21,7 +21,7 @@ def add_bg_from_local(image_file):
             background: rgba(0,0,0,0);
         }}
         [data-testid="stSidebar"] {{
-            background-color: rgba(255,255,255,0.7);
+            background-color: rgba(255,255,255,0.3);
         }}
         /* 🔹 Force ALL sidebar text to black */
         [data-testid="stSidebar"] * {{
@@ -37,8 +37,9 @@ add_bg_from_local("medical-equipment-with-copy-space.jpg")
 st.sidebar.image("logo1.jpg", use_container_width=True)  # optional logo
 st.sidebar.title("📌 Navigation")
 page = st.sidebar.radio(
-    "Go to:",
-    ["Home", "Prior Authorization", "Audit Logs"]
+    "Menu",
+    ["Home", "Prior Authorization", "Audit Logs"],
+    label_visibility="collapsed"
 )
 
 if page == "Home":
