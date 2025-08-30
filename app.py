@@ -5,7 +5,7 @@ import base64
 
 st.set_page_config(page_title="MEDGATE", layout="wide")
 
-def add_bg_from_local(image_file):
+def set_bg(image_file):
     with open(image_file, "rb") as f:
         encoded = base64.b64encode(f.read()).decode()
     st.markdown(
@@ -23,7 +23,6 @@ def add_bg_from_local(image_file):
         [data-testid="stSidebar"] {{
             background-color: rgba(255,255,255,0.3);
         }}
-        /* 🔹 Force ALL sidebar text to black */
         [data-testid="stSidebar"] * {{
             color: black !important;
         }}
@@ -32,8 +31,7 @@ def add_bg_from_local(image_file):
         unsafe_allow_html=True
     )
 
-add_bg_from_local("medhome.jpg")
-
+# Sidebar
 st.sidebar.image("logo.jpg", use_container_width=True)  # optional logo
 st.sidebar.title("🔍 Explorer")
 page = st.sidebar.radio(
@@ -42,14 +40,18 @@ page = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
+# 🔹 Apply background depending on page
 if page == "Home":
+    set_bg("medhome.jpg")   # Home background
     st.title("🏤 PRIOR AUTHORIZATION AUTOMATION")
     st.header("Welcome to *MEDGATE*!")
     st.write("*The Smart Gateway to Faster Care Decisions*")
 
 elif page == "Prior Authorization":
+    set_bg("medhome1.jpg")  # background for PA page
     st.title("Prior Authorization")
     integrate5.render_pa_page()
 
 elif page == "Audit Logs":
+    set_bg("medhome1.jpg")  # background for Audit Logs
     auditnew1.render_audit_page()
