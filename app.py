@@ -3,7 +3,7 @@ import integrate5
 import auditnew1
 import base64
 
-st.set_page_config(page_title="PA & Audit Dashboard", layout="wide")
+st.set_page_config(page_title="MEDGATE", layout="wide")
 
 def add_bg_from_local(image_file):
     with open(image_file, "rb") as f:
@@ -43,9 +43,9 @@ page = st.sidebar.radio(
 )
 
 if page == "Home":
-    st.title("PRIOR AUTHORIZATION AUTOMATION")
+    st.title("🏤 PRIOR AUTHORIZATION AUTOMATION")
     st.header("Welcome to *MEDGATE*!")
-    st.write("The Smart Gateway to Faster Care Decisions")
+    st.write("*The Smart Gateway to Faster Care Decisions*")
 
 elif page == "Prior Authorization":
     st.title("Prior Authorization")
