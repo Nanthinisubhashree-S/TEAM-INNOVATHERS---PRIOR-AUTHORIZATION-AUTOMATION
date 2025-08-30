@@ -117,7 +117,7 @@ def render_audit_page():
         (base_filtered["timestamp"].dt.date <= prev_end)
     ]
 
-    st.subheader("📌 Key Metrics")
+    st.subheader("📌 Summary")
 
     total_logs = int(len(df_filtered))
     approved_count = int(df_filtered["final_decision"].value_counts().get("APPROVED", 0))
@@ -158,7 +158,7 @@ def render_audit_page():
             decision_counts,
             names="decision",
             values="count",
-            title="Decision Distribution",
+            title="Decision Status",
             hole=0.4
         )
         fig_pie.update_traces(
@@ -169,7 +169,7 @@ def render_audit_page():
 
         trend = df_filtered.groupby(df_filtered["timestamp"].dt.date).size().reset_index(name="count")
         trend.columns = ["timestamp", "count"]
-        fig_line = px.line(trend, x="timestamp", y="count", title="Logs Over Time", markers=True)
+        fig_line = px.line(trend, x="timestamp", y="count", title="Logs Trend", markers=True)
         st.plotly_chart(fig_line, use_container_width=True)
 
         if "provider_npi" in df_filtered:
