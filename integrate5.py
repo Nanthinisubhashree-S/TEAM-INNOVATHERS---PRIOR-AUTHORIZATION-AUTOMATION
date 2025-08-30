@@ -282,7 +282,7 @@ def render_pa_page():
         for line in text_lines:
             c.drawString(70, y, line.strip() + ".")
             y -= 15
-            if y < 100:  # new page if text overflows
+            if y < 100:
                 c.showPage()
                 y = height - 80
                 c.setFont("Helvetica", 11)
@@ -357,8 +357,8 @@ def render_pa_page():
 
         elif proof_choice == "X-ray Fracture":
             xray_file = st.file_uploader("Upload X-ray Image", type=["jpg", "jpeg", "png"])
-            if xray_file and extracted["ICD-10_Codes"]:  # use extracted ICD-10 directly
-                icd10_claimed = extracted["ICD-10_Codes"][0]  # take first extracted ICD-10
+            if xray_file and extracted["ICD-10_Codes"]:
+                icd10_claimed = extracted["ICD-10_Codes"][0]
                 image = Image.open(xray_file)
                 image_np = preprocess_image(image)
                 outputs = detect_fracture(image_np)
