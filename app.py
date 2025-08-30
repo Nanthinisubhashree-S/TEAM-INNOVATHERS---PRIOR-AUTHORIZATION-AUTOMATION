@@ -27,9 +27,8 @@ def set_bg(image_file):
             color: black !important;
         }}
         
-        /* Sidebar buttons same fixed length */
         div.stButton > button {{
-            width: 180px !important;   /* 🔹 fixed size (tune this to match "Prior Authorization") */
+            width: 180px !important;
             background-color: rgba(0, 123, 255, 0.15) !important;
             border: 1px solid rgba(0, 123, 255, 0.4) !important;
             color: black !important;
@@ -38,7 +37,7 @@ def set_bg(image_file):
             font-size: 1rem !important;
             font-weight: 500 !important;
             border-radius: 10px !important;
-            margin: 0.3rem auto 0.5rem auto !important; /* center inside sidebar */
+            margin: 0.3rem auto 0.5rem auto !important;
             box-shadow: 0px 2px 4px rgba(0,0,0,0.1) !important;
             transition: all 0.2s ease-in-out;
             display: block !important;
@@ -57,27 +56,22 @@ def set_bg(image_file):
         unsafe_allow_html=True
     )
 
-# Sidebar logo
 st.sidebar.image("logo.jpg", use_container_width=True)
 st.sidebar.title("🔍 Explorer")
 
-# Define sidebar navigation
 pages = {
     "Home": "home",
     "Prior Authorization": "pa",
     "Audit Logs": "audit"
 }
 
-# Create clickable buttons
 for name, key in pages.items():
     if st.sidebar.button(name, key=key):
         st.session_state.page = key
 
-# Default page
 if "page" not in st.session_state:
     st.session_state.page = "home"
 
-# Page routing
 if st.session_state.page == "home":
     set_bg("medhome.jpg")
     st.title("🏤 PRIOR AUTHORIZATION AUTOMATION")
