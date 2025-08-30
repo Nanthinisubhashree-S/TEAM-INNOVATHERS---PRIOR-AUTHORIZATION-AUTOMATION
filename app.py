@@ -31,7 +31,6 @@ def set_bg(image_file):
         unsafe_allow_html=True
     )
 
-# Sidebar
 st.sidebar.image("logo.jpg", use_container_width=True)  # optional logo
 st.sidebar.title("🔍 Explorer")
 page = st.sidebar.radio(
@@ -40,7 +39,6 @@ page = st.sidebar.radio(
     label_visibility="collapsed"
 )
 
-# 🔹 Apply background depending on page
 if page == "Home":
     set_bg("medhome.jpg")   # Home background
     st.title("🏤 PRIOR AUTHORIZATION AUTOMATION")
@@ -48,10 +46,10 @@ if page == "Home":
     st.write("*The Smart Gateway to Faster Care Decisions*")
 
 elif page == "Prior Authorization":
-    set_bg("medhome1.jpg")  # background for PA page
+    set_bg("medhome1.jpg")
     st.title("Prior Authorization")
     integrate5.render_pa_page()
 
 elif page == "Audit Logs":
-    set_bg("medhome1.jpg")  # background for Audit Logs
+    set_bg("medhome1.jpg")
     auditnew1.render_audit_page()
