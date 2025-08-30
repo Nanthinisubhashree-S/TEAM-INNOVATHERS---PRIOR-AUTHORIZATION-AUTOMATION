@@ -137,7 +137,7 @@ def render_audit_page():
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Total Logs", total_logs, total_delta)
     col2.metric("Approved", approved_count, approved_delta)
-    col3.metric("Denied", denied_count, denied_delta,  delta_color="inverse")
+    col3.metric("Denied", denied_count, denied_delta, delta_color="inverse")
     col4.metric("Pending", pending_count, pending_delta)
 
     st.subheader("📈 Visual Insights")
