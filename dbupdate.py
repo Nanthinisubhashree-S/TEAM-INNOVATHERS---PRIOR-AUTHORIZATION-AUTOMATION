@@ -3,14 +3,11 @@ import os
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "prior_auth.db")
 
-# Connect to database
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
-# 1. Delete all existing records in provider_table
 cursor.execute("DELETE FROM provider_table;")
 
-# 2. Prepare the first 5 provider records
 providers = [
     (1003008533, "Cardiologist", 28, 28, "2025-03-10", "2029-10-07"),
     (1003000126, "Orthologist", 12, 12, "2020-04-06", "2029-07-09"),
@@ -19,7 +16,6 @@ providers = [
     (1003000142, "Nephrologist", 41, 41, "2021-04-20", "2029-01-17")
 ]
 
-# 3. Insert the new provider records
 cursor.executemany("""
 INSERT INTO provider_table 
 (Rndrng_NPI, Rndrng_Prvdr_Type, Tot_Srvcs, Tot_Benes, Start_date, End_date)
