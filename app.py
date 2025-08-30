@@ -32,10 +32,10 @@ def add_bg_from_local(image_file):
         unsafe_allow_html=True
     )
 
-add_bg_from_local("medical-equipment-with-copy-space.jpg")
+add_bg_from_local("medhome.jpg")
 
-st.sidebar.image("logo1.jpg", use_container_width=True)  # optional logo
-st.sidebar.title("📌 Navigation")
+st.sidebar.image("logo.jpg", use_container_width=True)  # optional logo
+st.sidebar.title("🔍 Explorer")
 page = st.sidebar.radio(
     "Menu",
     ["Home", "Prior Authorization", "Audit Logs"],
@@ -43,11 +43,12 @@ page = st.sidebar.radio(
 )
 
 if page == "Home":
-    st.title("🏠 PRIOR AUTHORIZATION AUTOMATION")
-    st.write("Welcome! Use the navigation bar to access features.")
+    st.title("PRIOR AUTHORIZATION AUTOMATION")
+    st.header("Welcome to *MEDGATE*!")
+    st.write("The Smart Gateway to Faster Care Decisions")
 
 elif page == "Prior Authorization":
-    st.title("⚖ Prior Authorization")
+    st.title("Prior Authorization")
     integrate5.render_pa_page()
 
 elif page == "Audit Logs":

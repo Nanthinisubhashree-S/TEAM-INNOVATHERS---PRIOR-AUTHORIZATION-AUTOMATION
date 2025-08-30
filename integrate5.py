@@ -370,7 +370,7 @@ def render_pa_page():
 
                 if matched_codes:
                     proof_status = "APPROVED"
-                    st.success(f"Fracture Verified ✅ Detected: {detected_bones[0]}, Code: {matched_codes[0]}")
+                    st.success(f"Fracture Verified ✅ Detected: Fracture, Code: {matched_codes[0]}")
                 else:
                     proof_status = "DENIED"
                     st.error(f"Fracture Verification Failed ❌ (Expected: {icd10_claimed}, Got: {predicted_icd10_codes})")
