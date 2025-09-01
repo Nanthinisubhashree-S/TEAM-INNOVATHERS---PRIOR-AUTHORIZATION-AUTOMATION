@@ -161,11 +161,11 @@ def render_pa_page():
         if row:
             tot_srvcs, tot_benes = to_int(row[0]), to_int(row[1])
             if tot_srvcs > tot_benes:
-                failed.append("❌ Rule 4: Provider services exceed beneficiaries.")
+                failed.append("❌ Rule 4: Provider services exceed covered services.")
             else:
-                passed.append("✅ Rule 4: Provider services within beneficiary limit.")
+                passed.append("✅ Rule 4: Provider services within covered service limit.")
         else:
-            failed.append("❌ Rule 4: No provider service/beneficiary data found.")
+            failed.append("❌ Rule 4: No provider service data found.")
 
         # Rule 5: Provider type matches treatment
         treatment_provider_map = {
