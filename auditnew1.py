@@ -134,11 +134,10 @@ def render_audit_page():
     denied_delta = compute_delta(denied_count, prev_denied, total_logs)
     pending_delta = compute_delta(pending_count, prev_pending, total_logs)
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     col1.metric("Total Logs", total_logs, total_delta)
     col2.metric("Approved", approved_count, approved_delta)
     col3.metric("Denied", denied_count, denied_delta, delta_color="inverse")
-    col4.metric("Pending", pending_count, pending_delta)
 
     st.subheader("📈 Visual Insights")
 
